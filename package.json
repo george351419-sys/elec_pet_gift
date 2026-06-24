@@ -1,12 +1,13 @@
 {
   "name": "magic-pet",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "npm run dev --workspace=app",
+    "dev": "cd app && npm run dev",
     "build": "cd app && npm run build"
   },
-  "dependencies": {
-    "express": "^4.19.2",
-    "@volcengine/rtc": "^4.68.4"
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "global-agent": "^4.1.3"
   }
 }

@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@fdv/client': path.resolve(__dirname, '../full-duplex-voice/client/index.ts'),
+      '@volcengine/rtc': path.resolve(__dirname, 'node_modules/@volcengine/rtc/index.esm.min.js'),
     },
   },
   server: {

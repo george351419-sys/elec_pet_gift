@@ -1,9 +1,9 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm install --prefix app && npm run build",
+  "buildCommand": "node scripts/build-api.mjs && cd app && npm run build",
   "outputDirectory": "app/dist",
-  "installCommand": "npm install && npm install --prefix app",
+  "installCommand": "cd app && npm install",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
