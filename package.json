@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "cd app && npm run dev",
-    "build": "cd app && npm run build"
+    "build": "node scripts/build-api.mjs && cd app && npm run build"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
