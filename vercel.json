@@ -1,11 +1,9 @@
 {
+  "framework": "vite",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "app/dist",
+  "installCommand": "npm install",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/index.js": {
-      "runtime": "nodejs20.x",
-      "includeFiles": "full-duplex-voice/**,app/server/**"
-    }
-  }
+  ]
 }

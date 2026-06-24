@@ -11,3 +11,5 @@ dist
 *.swo
 tmp/
 temp/
+!app/package-lock.json
+!package-lock.json
