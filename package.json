@@ -1,0 +1,12 @@
+{
+  "name": "magic-pet",
+  "private": true,
+  "workspaces": ["app"],
+  "scripts": {
+    "dev": "npm run dev --workspace=app"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@volcengine/rtc": "^4.68.4"
+  }
+}

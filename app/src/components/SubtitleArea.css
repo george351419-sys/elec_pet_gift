@@ -1,0 +1,41 @@
+.subtitle-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 64px;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.subtitle-line {
+  margin: 0;
+  animation: subtitleIn 200ms ease-out;
+}
+
+.subtitle-line.agent.latest {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-caption-pet);
+  line-height: 1.4;
+}
+
+.subtitle-line.agent.prev {
+  font-size: 16px;
+  color: var(--color-caption-pet);
+  opacity: 0.4;
+}
+
+.subtitle-line.child {
+  font-size: 13px;
+  color: var(--color-caption-child);
+}
+
+.subtitle-label {
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+@keyframes subtitleIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

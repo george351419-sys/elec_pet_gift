@@ -1,0 +1,43 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-bg-from: #FFF8F0;
+  --color-bg-to: #EDE7FF;
+  --color-primary: #7C5CBF;
+  --color-primary-light: #E8DFFF;
+  --color-accent: #FF8C69;
+  --color-caption-pet: #3D2B6B;
+  --color-caption-child: #888888;
+  --color-card: #FFFFFF;
+  --color-border: #E0D8F5;
+  --color-disabled: #CCCCCC;
+  --radius-card: 20px;
+  --radius-btn: 999px;
+  --radius-input: 12px;
+  --shadow-card: 0 4px 20px rgba(124, 92, 191, 0.12);
+  --font: 'PingFang SC', 'HarmonyOS Sans', 'Noto Sans SC', sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  color: #2d2d2d;
+  background: linear-gradient(160deg, var(--color-bg-from) 0%, var(--color-bg-to) 100%);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: transform 100ms, box-shadow 100ms;
+}
+
+button:active { transform: scale(0.97); }

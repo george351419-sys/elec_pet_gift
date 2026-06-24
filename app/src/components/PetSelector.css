@@ -1,0 +1,65 @@
+.pet-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pet-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.pet-list::-webkit-scrollbar { display: none; }
+
+.pet-card {
+  flex-shrink: 0;
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px 10px;
+  border-radius: 16px;
+  background: #fff;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 10px rgba(124,92,191,0.08);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms, transform 100ms;
+}
+
+.pet-card:hover {
+  border-color: var(--color-primary-light);
+  background: #faf8ff;
+}
+
+.pet-card.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.pet-avatar-placeholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #f0eaff;
+  font-size: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.pet-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-caption-pet);
+  text-align: center;
+}
+
+.pet-desc {
+  font-size: 10px;
+  color: var(--color-caption-child);
+  text-align: center;
+  line-height: 1.4;
+}
