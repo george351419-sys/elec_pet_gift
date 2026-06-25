@@ -10,6 +10,9 @@ await esbuild.build({
   external: [
     '@volcengine/rtc',
   ],
+  banner: {
+    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+  },
 })
 
 console.log('✅ api/index.js built')
