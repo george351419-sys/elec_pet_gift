@@ -2,16 +2,16 @@ import { Router } from 'express'
 
 export const memoryRouter = Router()
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? ''
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 
 type Turn = { role: string; content: string; final?: boolean }
 type FactEntry = { key: string; value: string; updatedAt: number }
 
 async function callDeepSeek(systemPrompt: string, userContent: string): Promise<string> {
+  const apiKey = process.env.DEEPSEEK_API_KEY ?? ''
   const res = await fetch(DEEPSEEK_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
@@ -19,7 +19,9 @@ async function callDeepSeek(systemPrompt: string, userContent: string): Promise<
       response_format: { type: 'json_object' },
     }),
   })
-  const data = await res.json() as { choices?: { message?: { content?: string } }[] }
+  const text = await res.text()
+  if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${text.slice(0, 200)}`)
+  const data = JSON.parse(text) as { choices?: { message?: { content?: string } }[] }
   return data.choices?.[0]?.message?.content ?? '{}'
 }
 
@@ -51,9 +53,12 @@ memoryRouter.post('/extract', async (req, res) => {
 
   try {
     const raw = await callDeepSeek(systemPrompt, `对话记录：\n${dialogue}`)
+    console.log('[memory/extract] DeepSeek raw:', raw.slice(0, 400))
     const profile = JSON.parse(raw) as object
+    console.log('[memory/extract] profile keys:', Object.keys(profile))
     res.json({ profile })
-  } catch {
+  } catch (err) {
+    console.error('[memory/extract] error:', err)
     res.json({ profile: existing ?? {} })
   }
 })

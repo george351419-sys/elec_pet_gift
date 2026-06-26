@@ -94,43 +94,89 @@ export function createRtcSession(options: Options): RtcSessionController {
   }
   for (const key of Object.keys(sdk.events)) spyEvent(sdk.events[key])
 
-  // S2S sends both ConversationState (magic: "conv") and Subtitle (magic: "subv")
-  // as room binary messages. We need the subtitle ones for transcripts.
-  engine.on(sdk.events.onRoomBinaryMessageReceived, (e: any) => {
-    const msg = e?.message
-    if (!(msg instanceof ArrayBuffer)) return
-    const bytes = new Uint8Array(msg)
-    if (bytes.length < 8) return
+  // Helper: parse a TranscriptTurn from any subtitle-like JSON object and deliver it
+  const deliverSubtitleItem = (item: any, senderUserId?: string) => {
+    const text = String(item?.text ?? item?.content ?? '').trim()
+    if (!text) return
+    const uid = item?.userId ?? item?.user_id ?? senderUserId ?? ''
+    const isAgent = uid === remoteUserId || uid === options.session.agentUserId || uid === ''
+    options.onTranscript({
+      role: isAgent ? 'agent' : 'parent',
+      content: text,
+      final: Boolean(item.definite ?? item.isFinal ?? item.is_final ?? false),
+      sequence: Number(item.sequence ?? item.seq ?? 0),
+    })
+  }
 
-    // 4-byte magic + 4-byte big-endian length + JSON payload
-    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3])
-    const len = (bytes[4] << 24) | (bytes[5] << 16) | (bytes[6] << 8) | bytes[7]
-    if (len <= 0 || len > bytes.length - 8) return
-
-    const jsonStr = new TextDecoder('utf-8').decode(bytes.slice(8, 8 + len))
-    console.log('[rtc-session] ROOM BINARY magic:', magic, 'len:', len, 'json:', jsonStr.slice(0, 200))
-
-    if (magic === 'subv') {
-      try {
-        const parsed = JSON.parse(jsonStr)
-        // Subtitle payload wraps items in a "data" array
-        const items: any[] = parsed?.data ?? (Array.isArray(parsed) ? parsed : [parsed])
-        for (const item of items) {
-          const text = String(item?.text ?? '').trim()
-          if (!text) continue
-          const role = (item?.userId ?? parsed?.userId ?? e.userId) === remoteUserId
-            || (item?.userId ?? parsed?.userId ?? e.userId) === options.session.agentUserId
-            ? 'agent' : 'parent'
-          console.log('[rtc-session] SUBTITLE:', role, text.slice(0, 80), 'definite:', item.definite, 'seq:', item.sequence, 'paragraph:', item.paragraph)
-          options.onTranscript({
-            role, content: text,
-            final: Boolean(item.definite),
-            sequence: Number(item.sequence ?? 0),
-          })
-        }
-      } catch (err) { console.error('[rtc-session] subv parse error:', err) }
-    }
+  // Path A: RTS subtitle channel (DisableRTSSubtitle: false)
+  // S2S agent pushes subtitles via the RTS channel; client receives without calling startSubtitle().
+  engine.on(sdk.events.onSubtitleMessageReceived ?? 'onSubtitleMessageReceived', (items: any) => {
+    const arr: any[] = Array.isArray(items) ? items : (items ? [items] : [])
+    console.log('[rtc-session] onSubtitleMessageReceived fired, count:', arr.length, arr[0])
+    for (const item of arr) deliverSubtitleItem(item)
   })
+
+  // Path B: binary message channel (DisableRTSSubtitle: true) - kept as fallback
+  const parseBinary = (e: any) => {
+    const raw = e?.message ?? e?.data ?? e
+    let bytes: Uint8Array
+    if (raw instanceof Uint8Array) bytes = raw
+    else if (raw instanceof ArrayBuffer) bytes = new Uint8Array(raw)
+    else if (ArrayBuffer.isView(raw)) bytes = new Uint8Array((raw as any).buffer, (raw as any).byteOffset, (raw as any).byteLength)
+    else return
+
+    const hex = Array.from(bytes.slice(0, 24)).map((b) => b.toString(16).padStart(2, '0')).join(' ')
+    console.log('[rtc-session] binary msg len:', bytes.length, 'hex[0..24]:', hex, 'from:', e?.userId)
+
+    // Strategy 1: magic(4) + uint32BE-len(4) + JSON
+    if (bytes.length >= 8) {
+      const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3])
+      const len = (bytes[4] << 24) | (bytes[5] << 16) | (bytes[6] << 8) | bytes[7]
+      if (len > 0 && len <= bytes.length - 8) {
+        try {
+          const jsonStr = new TextDecoder().decode(bytes.slice(8, 8 + len))
+          console.log('[rtc-session] binary magic:', magic, 'json:', jsonStr.slice(0, 200))
+          if (magic === 'subv' || magic === 'SUBV') {
+            const parsed = JSON.parse(jsonStr)
+            const items: any[] = parsed?.data ?? (Array.isArray(parsed) ? parsed : [parsed])
+            for (const item of items) deliverSubtitleItem(item, e?.userId)
+            return
+          }
+        } catch { /* try next strategy */ }
+      }
+    }
+
+    // Strategy 2: raw JSON (no magic header)
+    try {
+      const jsonStr = new TextDecoder().decode(bytes)
+      const parsed = JSON.parse(jsonStr)
+      if (parsed?.text || parsed?.data?.[0]?.text) {
+        console.log('[rtc-session] binary raw-JSON parsed:', jsonStr.slice(0, 200))
+        const items: any[] = parsed?.data ?? [parsed]
+        for (const item of items) deliverSubtitleItem(item, e?.userId)
+      }
+    } catch { /* not JSON */ }
+  }
+
+  engine.on(sdk.events.onUserBinaryMessageReceived ?? 'onUserBinaryMessageReceived', parseBinary)
+  // Some SDK versions use onRoomBinaryMessageReceived; cover both
+  engine.on('onRoomBinaryMessageReceived', parseBinary)
+
+  // Path C: custom / text messages — some SDK versions deliver S2S data here
+  const parseMessage = (e: any) => {
+    const raw = typeof e === 'string' ? e : (e?.message ?? e?.data ?? '')
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed?.text || parsed?.data?.[0]?.text) {
+        console.log('[rtc-session] onCustomMessage parsed:', String(raw).slice(0, 200))
+        const items: any[] = parsed?.data ?? [parsed]
+        for (const item of items) deliverSubtitleItem(item, e?.userId)
+      }
+    } catch { /* not JSON */ }
+  }
+  engine.on(sdk.events.onUserMessageReceived ?? 'onUserMessageReceived', parseMessage)
+  engine.on(sdk.events.onCustomMessage ?? 'onCustomMessage', parseMessage)
   engine.on(sdk.events.onUserPublishStream, (event: any) => {
     if (!(event?.mediaType & MediaType.AUDIO)) return
     void playRemote(event.userId).catch((error) => options.onStatus(`接入远端声音失败：${message(error)}`))
@@ -145,20 +191,8 @@ export function createRtcSession(options: Options): RtcSessionController {
     const active = (items || []).find((item) => linearVolume(item) > 0)
     options.onRemoteLevel(active ? Math.min(1, linearVolume(active) / 120) : 0)
   })
-  console.log('[rtc-session] sdk.events.onSubtitleMessageReceived =', sdk.events.onSubtitleMessageReceived)
   engine.on(sdk.events.onSubtitleStateChanged ?? 'onSubtitleStateChanged', (e: any) => {
     console.log('[rtc-session] subtitle STATE changed:', JSON.stringify(e))
-  })
-  engine.on(sdk.events.onSubtitleMessageReceived ?? 'onSubtitleMessageReceived', (items: any[]) => {
-    console.log('[rtc-session] subtitle event, items:', items?.length, items?.[0])
-    for (const item of items || []) {
-      const content = String(item?.text || '').trim()
-      if (!content) continue
-      options.onTranscript({
-        role: item.userId === remoteUserId || item.userId === options.session.agentUserId ? 'agent' : 'parent',
-        content, final: Boolean(item.definite), sequence: Number(item.sequence || 0),
-      })
-    }
   })
   engine.on(sdk.events.onAutoplayFailed, () => { if (remoteUserId) attachRemoteTrack(remoteUserId) })
   engine.on(sdk.events.onError, (event: any) => options.onStatus(`RTC 异常：${message(event)}`))
@@ -169,12 +203,15 @@ export function createRtcSession(options: Options): RtcSessionController {
       await engine.joinRoom(options.session.token, options.session.roomId, { userId: options.session.userId }, {
         isAutoPublish: false, isAutoSubscribeAudio: true, isAutoSubscribeVideo: false, roomProfileType: RoomProfileType.chatRoom,
       })
-      // Don't call startSubtitle — S2S model pushes subtitles through RTC message channel
-      // when SubtitleConfig.SubtitleEnabled=true. Client-side startSubtitle requires a
-      // separate ASR service configured in the RTC console, which is NOT needed for S2S.
+      // startSubtitle() activates the client's subscription to the RTS subtitle channel.
+      // Even for S2S (where subtitles are server-pushed), this call is required before
+      // onSubtitleMessageReceived fires. Failure is non-fatal — binary channel is the fallback.
       try {
-        console.log('[rtc-session] SKIPPING startSubtitle — S2S model will push subtitles via message channel')
-      } catch { /* unreachable */ }
+        if (engine.startSubtitle) {
+          await engine.startSubtitle({ mode: 0, targetUserId: [options.session.agentUserId] })
+          console.log('[rtc-session] startSubtitle OK')
+        }
+      } catch (err) { console.warn('[rtc-session] startSubtitle failed (non-fatal):', err) }
       await engine.startAudioCapture()
       await engine.publishStream(MediaType.AUDIO)
       options.onDiagnostic('麦克风已发布到 RTC 房间。')

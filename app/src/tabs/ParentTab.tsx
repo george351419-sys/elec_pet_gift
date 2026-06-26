@@ -132,6 +132,7 @@ export function ParentTab() {
 
     if (!finalTurns.length) {
       pendingExtractRef.current = null
+      setExtractError('本次对话未收到字幕数据，无法自动整理档案。请手动填写下方表单，或重新进行一次访谈。')
       return
     }
 
@@ -143,7 +144,11 @@ export function ParentTab() {
     setExtractError(null)
     try {
       const extracted = await extractionPromise
-      console.log('[ParentTab] extracted profile:', extracted)
+      console.log('[ParentTab] extracted profile:', JSON.stringify(extracted))
+      if (Object.keys(extracted).length === 0) {
+        setExtractError('AI 整理返回了空结果，请手动填写档案。')
+        return
+      }
       setDraft((prev) => ({ ...prev, ...extracted }))
     } catch (e) {
       console.error('[ParentTab] extractProfile failed:', e)

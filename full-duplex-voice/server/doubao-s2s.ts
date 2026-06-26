@@ -98,7 +98,7 @@ export function buildStartPayload(input: { session: DoubaoSession; mode: VoiceMo
           tts: input.session.speaker ? { speaker: input.session.speaker } : undefined,
         },
       },
-      SubtitleConfig: { SubtitleEnabled: true, DisableRTSSubtitle: false, SubtitleMode: 1 }, InterruptMode: 0,
+      SubtitleConfig: { SubtitleEnabled: true, SubtitleMode: 1, DisableRTSSubtitle: false }, InterruptMode: 0,
     },
   }
 }

@@ -1,3 +1,8 @@
+import { config } from 'dotenv'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '.env') })
+
 import express from 'express'
 import { createDoubaoRealtimeRouter } from '../../full-duplex-voice/server/router.ts'
 import { memoryRouter } from './memory.ts'
