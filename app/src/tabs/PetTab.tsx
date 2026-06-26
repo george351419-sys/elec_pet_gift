@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { FullDuplexVoice } from '@fdv/client'
 import type { FullDuplexVoiceHandle, VoiceCompletion, VoiceState, VoiceContext } from '@fdv/client'
 import { PetAvatar } from '../components/PetAvatar'
+import type { Emotion } from '../components/PetAvatar'
 import { getProfile, getFacts, getSummaries, saveFacts, saveSummaries, mergeFacts } from '../lib/storage'
 import { updateMemory } from '../lib/memoryApi'
 import './PetTab.css'
@@ -22,6 +23,8 @@ export function PetTab() {
   const fdvRef = useRef<FullDuplexVoiceHandle>(null)
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [voiceState, setVoiceState] = useState<VoiceState | null>(null)
+  const [emotion, setEmotion] = useState<Emotion>('idle')
+  const happyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auto-advance: when check() finishes (phase → 'ready'), immediately call start()
   useEffect(() => {
@@ -29,6 +32,38 @@ export function PetTab() {
       fdvRef.current?.start()
     }
   }, [voiceState?.phase])
+
+  // Derive emotion from voice state
+  useEffect(() => {
+    const phase = voiceState?.phase
+    if (phase !== 'connected') {
+      setEmotion('idle')
+      return
+    }
+    const remote = voiceState?.remoteLevel ?? 0
+    const input = voiceState?.inputLevel ?? 0
+
+    if (remote > 0.55) {
+      setEmotion('excited')
+    } else if (remote > 0.06) {
+      setEmotion('talking')
+    } else if (input > 0.08) {
+      // child speaking → pet is attentive / happy
+      setEmotion('happy')
+    } else {
+      setEmotion('idle')
+    }
+  }, [voiceState?.phase, voiceState?.remoteLevel, voiceState?.inputLevel])
+
+  // Brief happy flash when first connected
+  useEffect(() => {
+    if (voiceState?.phase === 'connected') {
+      setEmotion('happy')
+      happyTimer.current = setTimeout(() => setEmotion('idle'), 2200)
+    }
+    return () => { if (happyTimer.current) clearTimeout(happyTimer.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceState?.phase === 'connected'])
 
   // Auto-hangup: 5 seconds of no user voice input while connected
   useEffect(() => {
@@ -113,6 +148,7 @@ export function PetTab() {
           petName={profile.petName || ''}
           remoteLevel={remoteLevel}
           speaking={isConnected && remoteLevel > 0.05}
+          emotion={emotion}
         />
       </div>
 
